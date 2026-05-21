@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "resume-parser-frontend": "file:.."
+  }
+}
