@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ResumeUpload from "../components/ResumeUpload";
+import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -80,6 +81,7 @@ function Ring({ value, label, color = "#7c3aed" }) {
             style={{ transition: "stroke-dashoffset 0.8s ease" }}
           />
         </svg>
+
         <div className="absolute inset-0 flex items-center justify-center flex-col">
           <span className="text-2xl font-bold">{value}%</span>
           <span className="text-[11px] text-white/45">{label}</span>
@@ -90,6 +92,8 @@ function Ring({ value, label, color = "#7c3aed" }) {
 }
 
 export default function DashboardPage() {
+  const { logout } = useAuth();
+
   const [summary, setSummary] = useState({
     applications: 0,
     shortlisted: 0,
@@ -99,6 +103,9 @@ export default function DashboardPage() {
 
   const [lineData, setLineData] = useState([]);
   const [pieData, setPieData] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -135,11 +142,41 @@ export default function DashboardPage() {
       }
     };
 
+    const fetchCandidates = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/api/candidates");
+        const data = await res.json();
+        setCandidates(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.log("Candidates fetch error:", err);
+      }
+    };
+
     fetchSummary();
-    const interval = setInterval(fetchSummary, 3000);
+    fetchCandidates();
+
+    const interval = setInterval(() => {
+      fetchSummary();
+      fetchCandidates();
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const filteredCandidates = candidates.filter((c) => {
+    const name = (c.name || "").toLowerCase();
+    const email = (c.email || "").toLowerCase();
+    const decision = (c.decision || "").toLowerCase();
+
+    const matchesSearch =
+      name.includes(searchTerm.toLowerCase()) ||
+      email.includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all" || decision === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = [
     {
@@ -186,7 +223,7 @@ export default function DashboardPage() {
               RS
             </div>
             <div>
-              <h1 className="text-lg font-semibold leading-tight">Resume Rank Ai </h1>
+              <h1 className="text-lg font-semibold leading-tight">Resume Rank Ai</h1>
               <p className="text-xs text-white/50">AI Hiring Dashboard</p>
             </div>
           </div>
@@ -254,7 +291,10 @@ export default function DashboardPage() {
               <button className="rounded-2xl bg-white/10 p-3 hover:bg-white/15 transition">
                 <Bell size={18} />
               </button>
-              <button className="rounded-2xl bg-white/10 px-4 py-3 text-sm hover:bg-white/15 transition flex items-center gap-2">
+              <button
+                onClick={logout}
+                className="rounded-2xl bg-white/10 px-4 py-3 text-sm hover:bg-white/15 transition flex items-center gap-2"
+              >
                 <LogOut size={16} />
                 Logout
               </button>
@@ -346,7 +386,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <h3 className="text-2xl font-semibold">Upload & Analyze</h3>
+                    <h3 className="text-xl font-semibold">Upload & Analyze</h3>
                     <p className="text-sm text-white/45">Drop a resume and let the AI extract the details.</p>
                   </div>
                   <div className="hidden md:inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-300">
@@ -357,6 +397,90 @@ export default function DashboardPage() {
 
                 <ResumeUpload />
               </motion.div>
+
+              <div className="rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl p-5 md:p-6 shadow-xl shadow-black/20">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-semibold">Candidate History</h3>
+                    <p className="text-sm text-white/45">Live candidates from backend</p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      placeholder="Search by name/email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none placeholder:text-white/35"
+                    />
+
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="all">All</option>
+                      <option value="shortlist">Shortlist</option>
+                      <option value="hold">Hold</option>
+                      <option value="reject">Reject</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-white/50 border-b border-white/10">
+                        <th className="py-3 pr-4">Name</th>
+                        <th className="py-3 pr-4">Email</th>
+                        <th className="py-3 pr-4">Score</th>
+                        <th className="py-3 pr-4">Decision</th>
+                        <th className="py-3 pr-4">Skills</th>
+                        <th className="py-3 pr-4">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCandidates.length > 0 ? (
+                        filteredCandidates.map((c, index) => (
+                          <tr
+                            key={index}
+                            className="border-b border-white/5 hover:bg-white/5 transition"
+                          >
+                            <td className="py-4 pr-4 font-medium">{c.name || "N/A"}</td>
+                            <td className="py-4 pr-4 text-white/70">{c.email || "N/A"}</td>
+                            <td className="py-4 pr-4">{c.score ?? 0}%</td>
+                            <td className="py-4 pr-4">
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                                  c.decision === "shortlist"
+                                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/20"
+                                    : c.decision === "hold"
+                                    ? "bg-amber-500/15 text-amber-300 border border-amber-400/20"
+                                    : "bg-rose-500/15 text-rose-300 border border-rose-400/20"
+                                }`}
+                              >
+                                {c.decision || "N/A"}
+                              </span>
+                            </td>
+                            <td className="py-4 pr-4 text-white/60">
+                              {Array.isArray(c.skills) && c.skills.length > 0
+                                ? c.skills.slice(0, 3).join(", ")
+                                : "N/A"}
+                            </td>
+                            <td className="py-4 pr-4 text-white/50">{c.date || "-"}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="py-8 text-center text-white/45">
+                            No candidates found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5">
                 <div className="rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl p-5 shadow-xl shadow-black/20">

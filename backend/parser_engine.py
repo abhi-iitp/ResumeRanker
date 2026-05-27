@@ -2,8 +2,8 @@ import os
 import fitz
 import docx
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer, util
+
 import spacy
 
 # =========================
@@ -11,10 +11,13 @@ import spacy
 # =========================
 try:
     nlp = spacy.load("en_core_web_sm")
+    semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
+
 except:
     os.system("python -m spacy download en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
 
+    nlp = spacy.load("en_core_web_sm")
+    semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # =========================
 # Extract text
@@ -144,15 +147,28 @@ def extract_and_expand_skills(cleaned_text):
 # =========================
 # Semantic Match
 # =========================
-def advanced_semantic_match(resume_text, job_desc):
+def advanced_semantic_match(resume_text, job_desc_text):
     try:
-        vectorizer = TfidfVectorizer()
-        tfidf = vectorizer.fit_transform([resume_text, job_desc])
-        score = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
-        return round(score * 100, 2)
-    except:
-        return 0
+        res_embedding = semantic_model.encode(
+            resume_text,
+            convert_to_tensor=True
+        )
 
+        job_embedding = semantic_model.encode(
+            job_desc_text,
+            convert_to_tensor=True
+        )
+
+        semantic_score = util.cos_sim(
+            res_embedding,
+            job_embedding
+        ).item()
+
+        return round(semantic_score * 100, 2)
+
+    except Exception as e:
+        print("Semantic Match Error:", e)
+        return 0
 
 # =========================
 # Main Resume Processing
