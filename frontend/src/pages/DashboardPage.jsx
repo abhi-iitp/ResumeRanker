@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [candidates, setCandidates] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [scoreFilter, setScoreFilter] = useState("all");
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -164,19 +165,29 @@ export default function DashboardPage() {
   }, []);
 
   const filteredCandidates = candidates.filter((c) => {
-    const name = (c.name || "").toLowerCase();
-    const email = (c.email || "").toLowerCase();
-    const decision = (c.decision || "").toLowerCase();
+  const name = (c.name || "").toLowerCase();
+  const email = (c.email || "").toLowerCase();
+  const decision = (c.decision || "").toLowerCase();
+  const score = Number(c.score || 0);
 
-    const matchesSearch =
-      name.includes(searchTerm.toLowerCase()) ||
-      email.includes(searchTerm.toLowerCase());
+  const matchesSearch =
+    name.includes(searchTerm.toLowerCase()) ||
+    email.includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === "all" || decision === statusFilter;
+  const matchesStatus =
+    statusFilter === "all" || decision === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+  const matchesScore =
+    scoreFilter === "all"
+      ? true
+      : scoreFilter === "90+"
+      ? score >= 90
+      : scoreFilter === "70-89"
+      ? score >= 70 && score < 90
+      : score < 70;
+
+  return matchesSearch && matchesStatus && matchesScore;
+});
 
   const stats = [
     {
